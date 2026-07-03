@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Demo · список задач</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: #f4f6fb;
+      font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; color: #1a1d24;
+      display: flex; align-items: flex-start; justify-content: center; padding: 64px 16px;
+    }
+    .card {
+      background: #fff; width: 460px; max-width: 100%; border-radius: 14px;
+      box-shadow: 0 10px 40px rgba(20,30,60,0.10); padding: 28px;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p.sub { margin: 0 0 20px; color: #6b7280; font-size: 13px; }
+    .row { display: flex; gap: 8px; }
+    input {
+      flex: 1; padding: 11px 13px; border: 1px solid #d5d9e2; border-radius: 9px;
+      font-size: 15px; outline: none;
+    }
+    input:focus { border-color: #5b7cfa; box-shadow: 0 0 0 3px rgba(91,124,250,0.15); }
+    button {
+      padding: 11px 18px; border: 0; border-radius: 9px; background: #5b7cfa; color: #fff;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    button:hover { background: #4a6bf0; }
+    ul { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 8px; }
+    li {
+      padding: 12px 14px; background: #f7f8fc; border: 1px solid #eceef4;
+      border-radius: 9px; display: flex; align-items: center; gap: 10px;
+      animation: pop .18s ease;
+    }
+    li .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; flex: 0 0 auto; }
+    @keyframes pop { from { transform: translateY(-4px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .empty { color: #9aa1ad; font-size: 13px; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Список задач</h1>
+    <p class="sub">Демо-приложение для скилла video-walkthrough</p>
+    <div class="row">
+      <input data-testid="task-input" placeholder="Что нужно сделать?" />
+      <button data-testid="add">Добавить</button>
+    </div>
+    <ul data-testid="task-list"></ul>
+    <div class="empty" data-testid="empty">Пока пусто — добавьте первую задачу.</div>
+  </main>
+  <script>
+    const input = document.querySelector('[data-testid="task-input"]')
+    const list = document.querySelector('[data-testid="task-list"]')
+    const empty = document.querySelector('[data-testid="empty"]')
+    function add() {
+      const text = input.value.trim()
+      if (!text) return
+      const li = document.createElement('li')
+      li.setAttribute('data-testid', 'task-row')
+      li.innerHTML = '<span class="dot"></span>' + text.replace(/</g, '&lt;')
+      list.prepend(li)
+      input.value = ''
+      empty.style.display = 'none'
+      input.focus()
+    }
+    document.querySelector('[data-testid="add"]').addEventListener('click', add)
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') add() })
+  </script>
+</body>
+</html>
