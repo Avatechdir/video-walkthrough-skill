@@ -4,3 +4,4 @@ playwright-report/
 test-results/
 
 # videos/*.mp4 и *.srt — В git: это документация (последняя версия на сценарий).
+__pycache__/
