@@ -6,10 +6,17 @@
     python3 lib/narrate.py videos/example.mp4    # одно видео
     python3 lib/narrate.py videos --engine say   # принудительно движок
 
-Движки (--engine auto|silero|say):
-    silero — локальная нейросеть, лучший русский (нужен: pip install torch)
+Движки (--engine auto|silero|edge|say):
+    silero — локальная нейросеть, офлайн, детерминированно; SSML-паузы и
+             смысловые акценты из sidecar-файла <видео>.speech.json
+    edge   — нейроголоса Microsoft (Svetlana), «качественная озвучка»:
+             живая интонация из коробки, но облако и неофициальный API
     say    — macOS `say -v Milena`, без установки
-    auto   — silero, если доступен torch, иначе say
+    auto   — silero, если доступен torch (в т.ч. через venv скилла), иначе say
+
+Sidecar смысловых акцентов (только silero): <видео>.speech.json —
+{"текст субтитра": {"emphasis": ["ключевое слово", …]}, …}
+Ключевые слова читаются чуть медленнее с микропаузами вокруг.
 
 Видео перезаписывается на месте (аудиодорожка заменяется целиком, так что
 повторный прогон идемпотентен). Токенов не тратит — чистое выполнение кода.
@@ -29,6 +36,7 @@ SILERO_VENV_PYTHON = Path.home() / ".claude/skills/video-walkthrough/.venv/bin/p
 
 SILERO_SPEAKER = "xenia"
 SILERO_SAMPLE_RATE = 48000
+EDGE_VOICE = "ru-RU-SvetlanaNeural"
 SAY_VOICE = "Milena"
 SAY_RATE = 180  # слов/мин
 MAX_ATEMPO = 2.0  # предел ускорения фразы, не влезающей в свой слот
@@ -58,18 +66,29 @@ def parse_srt(path: Path):
     return cues
 
 
+def _reexec_into_venv():
+    """Зависимости живут в venv скилла — перезапускаемся в него один раз."""
+    if SILERO_VENV_PYTHON.exists() and not os.environ.get("NARRATE_REEXEC"):
+        os.environ["NARRATE_REEXEC"] = "1"
+        os.execv(str(SILERO_VENV_PYTHON), [str(SILERO_VENV_PYTHON)] + sys.argv)
+
+
 def pick_engine(requested: str) -> str:
     if requested == "say":
         return "say"
+    if requested == "edge":
+        try:
+            import edge_tts  # noqa: F401
+            return "edge"
+        except ImportError:
+            _reexec_into_venv()
+            sys.exit("edge недоступен: pip install edge-tts в venv скилла "
+                     f"({SILERO_VENV_PYTHON.parent.parent})")
     try:
         import torch  # noqa: F401
         return "silero"
     except ImportError:
-        pass
-    # torch нет в текущем интерпретаторе — перезапускаемся в venv скилла
-    if SILERO_VENV_PYTHON.exists() and not os.environ.get("NARRATE_REEXEC"):
-        os.environ["NARRATE_REEXEC"] = "1"
-        os.execv(str(SILERO_VENV_PYTHON), [str(SILERO_VENV_PYTHON)] + sys.argv)
+        _reexec_into_venv()
     if requested == "silero":
         sys.exit("silero недоступен: нет torch и нет venv "
                  f"({SILERO_VENV_PYTHON})")
@@ -204,10 +223,40 @@ def speech_text(text: str) -> str:
     return result
 
 
+def build_ssml(text: str, emphasis=()) -> str:
+    """SSML для silero: паузы по пунктуации + смысловые акценты.
+    Ключевые слова читаются медленнее с микропаузами — эмуляция emphasis,
+    которого у Silero нет. Каждый фрагмент проходит speech_text отдельно."""
+    from xml.sax.saxutils import escape
+
+    parts = [(False, text)]
+    for phrase in emphasis:
+        splitted = []
+        for is_emph, frag in parts:
+            if is_emph:
+                splitted.append((is_emph, frag))
+                continue
+            pieces = re.split(f"({re.escape(phrase)})", frag,
+                              flags=re.IGNORECASE)
+            splitted += [(i % 2 == 1, p) for i, p in enumerate(pieces) if p]
+        parts = splitted
+
+    out = []
+    for is_emph, frag in parts:
+        s = escape(speech_text(frag))
+        s = s.replace("—", '<break time="350ms"/>')
+        s = re.sub(r":\s", ':<break time="250ms"/> ', s)
+        if is_emph:
+            s = (f'<break time="150ms"/><prosody rate="slow">{s}</prosody>'
+                 f'<break time="100ms"/>')
+        out.append(s)
+    return "<speak>" + "".join(out) + "</speak>"
+
+
 _silero_model = None
 
 
-def synth_silero(text: str, out_wav: Path):
+def synth_silero(text: str, out_wav: Path, emphasis=()):
     global _silero_model
     import torch
     import wave
@@ -218,7 +267,7 @@ def synth_silero(text: str, out_wav: Path):
             language="ru", speaker="v4_ru", trust_repo=True,
         )
     audio = _silero_model.apply_tts(
-        text=speech_text(text), speaker=SILERO_SPEAKER,
+        ssml_text=build_ssml(text, emphasis), speaker=SILERO_SPEAKER,
         sample_rate=SILERO_SAMPLE_RATE
     )
     pcm = (audio.clamp(-1, 1) * 32767).to(torch.int16).numpy().tobytes()
@@ -227,6 +276,16 @@ def synth_silero(text: str, out_wav: Path):
         w.setsampwidth(2)
         w.setframerate(SILERO_SAMPLE_RATE)
         w.writeframes(pcm)
+
+
+def synth_edge(text: str, out_mp3: Path):
+    """Нейроголос Microsoft: сам интонирует по смыслу, читает латиницу
+    и числа — препроцессор не нужен, только маркер темы заменяем паузой."""
+    import asyncio
+    import edge_tts
+    asyncio.run(
+        edge_tts.Communicate(text.replace("·", "."), EDGE_VOICE)
+        .save(str(out_mp3)))
 
 
 def synth_say(text: str, out_aiff: Path):
@@ -255,13 +314,26 @@ def narrate(video: Path, engine: str) -> bool:
         print(f"  пропуск: {srt.name} пуст")
         return False
 
+    sidecar = {}
+    sidecar_path = video.with_suffix(".speech.json")
+    if sidecar_path.exists():
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+
     video_dur = probe_duration(video)
+    ext = {"silero": "wav", "edge": "mp3", "say": "aiff"}[engine]
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         clips = []
         for i, (start, end, text) in enumerate(cues):
-            clip = tmp / (f"cue{i}.wav" if engine == "silero" else f"cue{i}.aiff")
-            (synth_silero if engine == "silero" else synth_say)(text, clip)
+            clip = tmp / f"cue{i}.{ext}"
+            if engine == "silero":
+                meta = sidecar.get(text, {})
+                emphasis = meta.get("emphasis", []) if isinstance(meta, dict) else meta
+                synth_silero(text, clip, emphasis)
+            elif engine == "edge":
+                synth_edge(text, clip)
+            else:
+                synth_say(text, clip)
             clips.append((start, end, text, clip))
 
         # Каждая фраза: ресемпл в моно 48к, ужатие в свой слот, сдвиг на start.
@@ -308,7 +380,8 @@ def narrate(video: Path, engine: str) -> bool:
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("target", help=".mp4 или каталог с .mp4+.srt")
-    ap.add_argument("--engine", choices=["auto", "silero", "say"], default="auto")
+    ap.add_argument("--engine", choices=["auto", "silero", "edge", "say"],
+                    default="auto")
     args = ap.parse_args()
 
     target = Path(args.target)
