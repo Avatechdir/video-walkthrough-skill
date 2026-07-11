@@ -105,6 +105,39 @@ def _seconds_form(num: str) -> str:
         n % 10, "секунд")
 
 
+_runorm = None
+
+
+def _normalize_latin(fragment: str) -> str:
+    """Незнакомая латиница: транслитерация runorm (small) по токенам —
+    страховка от молчаливого выпадения слов. Точное произношение терминов
+    задаёт accents.json, он применяется раньше и имеет приоритет."""
+    tokens = {t.rstrip("+./_-") for t in
+              re.findall(r"[A-Za-z][A-Za-z0-9+./_-]*", fragment)}
+    tokens.discard("")
+    if not tokens:
+        return fragment
+    global _runorm
+    if _runorm is None:
+        try:
+            from runorm import RUNorm
+            _runorm = RUNorm()
+            _runorm.load(model_size="small", device="cpu",
+                         workdir=str(Path.home()
+                                     / ".claude/skills/video-walkthrough/.runorm"))
+        except ImportError:
+            _runorm = False
+    if not _runorm:
+        return fragment
+    for tok in sorted(tokens, key=len, reverse=True):
+        out = _runorm.norm(tok).strip()
+        # подменяем, только если латиницы не осталось (иначе пусть предупредит)
+        if out and not re.search(r"[A-Za-z]", out):
+            fragment = fragment.replace(tok, out)
+            print(f"  ℹ {tok} → «{out}» (runorm; точнее — записью в accents.json)")
+    return fragment
+
+
 def _auto_accent(fragment: str) -> str:
     """Числа словами + автоударения RUAccent для «обычного» текста."""
     # «с» после числа — секунды, а не предлог; «±» RUAccent молча съедает
@@ -123,6 +156,7 @@ def _auto_accent(fragment: str) -> str:
                           fragment)
     except ImportError:
         pass
+    fragment = _normalize_latin(fragment)
     global _accentizer
     if _accentizer is None:
         try:
