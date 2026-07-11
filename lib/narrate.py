@@ -94,10 +94,30 @@ def load_accent_dict() -> dict:
     return _accent_dict
 
 
+def _seconds_form(num: str) -> str:
+    """секунда/секунды/секунд по правилам согласования с числом."""
+    if "." in num or "," in num:
+        return "секунды"  # дробь: «ноль запятая пять секунды»
+    n = int(num) % 100
+    if 11 <= n <= 14:
+        return "секунд"
+    return {1: "секунда", 2: "секунды", 3: "секунды", 4: "секунды"}.get(
+        n % 10, "секунд")
+
+
 def _auto_accent(fragment: str) -> str:
     """Числа словами + автоударения RUAccent для «обычного» текста."""
+    # «с» после числа — секунды, а не предлог; «±» RUAccent молча съедает
+    fragment = re.sub(r"(\d+(?:[.,]\d+)?)\s*с\b",
+                      lambda m: f"{m.group(1)} {_seconds_form(m.group(1))}",
+                      fragment)
+    fragment = fragment.replace("±", " плюс-минус ")
     try:
         from num2words import num2words
+        fragment = re.sub(
+            r"\d+[.,]\d+",
+            lambda m: num2words(float(m.group().replace(",", ".")), lang="ru"),
+            fragment)
         fragment = re.sub(r"\d+",
                           lambda m: num2words(int(m.group()), lang="ru"),
                           fragment)
