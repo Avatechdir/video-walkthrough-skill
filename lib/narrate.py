@@ -278,14 +278,26 @@ def synth_silero(text: str, out_wav: Path, emphasis=()):
         w.writeframes(pcm)
 
 
+def edge_text(text: str) -> str:
+    """Подготовка текста для edge: словарь произношений применяется как
+    простая подмена текста (Svetlana читает «мэнэджэр» как написано),
+    `+`-разметка ударений отбрасывается — edge её не понимает, а SSML-фонемы
+    через edge-tts не работают. RUAccent/числа/runorm не нужны — голос сам."""
+    text = text.replace("·", ".")
+    d = load_accent_dict()
+    for key in sorted(d, key=len, reverse=True):
+        text = re.sub(rf"(?<!\w){re.escape(key)}(?!\w)",
+                      d[key].replace("+", ""), text, flags=re.IGNORECASE)
+    return text
+
+
 def synth_edge(text: str, out_mp3: Path):
     """Нейроголос Microsoft: сам интонирует по смыслу, читает латиницу
-    и числа — препроцессор не нужен, только маркер темы заменяем паузой."""
+    и числа; словарь произношений применяется текстовой подменой."""
     import asyncio
     import edge_tts
     asyncio.run(
-        edge_tts.Communicate(text.replace("·", "."), EDGE_VOICE)
-        .save(str(out_mp3)))
+        edge_tts.Communicate(edge_text(text), EDGE_VOICE).save(str(out_mp3)))
 
 
 def synth_say(text: str, out_aiff: Path):
