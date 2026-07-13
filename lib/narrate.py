@@ -100,16 +100,24 @@ _accent_dict = None
 
 
 def load_accent_dict() -> dict:
-    """Словарь произношений: глобальный из скилла + локальный рядом со скриптом
-    (локальный имеет приоритет). Ключи — термины как в субтитрах, значения —
-    как их читать (кириллицей, `+` перед ударной гласной)."""
+    """Словарь произношений: глобальный из скилла + проектный override рядом с
+    местом запуска (`./lib/accents.json` или `./accents.json` относительно cwd —
+    проектная лексика перекрывает глобальную). Ищем по cwd, а не по `__file__`,
+    чтобы override работал и когда зовём глобальный narrate.py из проекта.
+    Ключи — термины как в субтитрах, значения — как читать (кириллицей,
+    `+` перед ударной гласной)."""
     global _accent_dict
     if _accent_dict is None:
         _accent_dict = {}
+        seen = set()
         for p in (Path.home() / ".claude/skills/video-walkthrough/lib/accents.json",
-                  Path(__file__).resolve().parent / "accents.json"):
-            if p.exists():
-                _accent_dict.update(json.loads(p.read_text(encoding="utf-8")))
+                  Path.cwd() / "lib" / "accents.json",
+                  Path.cwd() / "accents.json"):
+            p = p.resolve()
+            if p in seen or not p.exists():
+                continue
+            seen.add(p)
+            _accent_dict.update(json.loads(p.read_text(encoding="utf-8")))
     return _accent_dict
 
 
