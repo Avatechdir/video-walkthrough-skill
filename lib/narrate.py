@@ -381,6 +381,7 @@ def narrate(video: Path, engine: str) -> bool:
              "-filter_complex", filter_graph,
              "-map", "0:v", "-map", "[mix]",
              "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+             "-movflags", "+faststart",  # moov в начало — плеер стартует сразу
              str(out)],
             check=True,
         )
