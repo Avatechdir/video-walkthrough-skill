@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Claude Code skill: Playwright-сценарии как автотесты + видео-инструкции с субтитрами по шагам",
   "scripts": {
+    "setup": "bash setup.sh",
     "test": "playwright test --project=fast",
     "video": "playwright test --project=video",
     "video:burn": "BURN_SUBS=1 playwright test --project=video",

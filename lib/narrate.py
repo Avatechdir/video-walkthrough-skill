@@ -82,16 +82,16 @@ def pick_engine(requested: str) -> str:
             return "edge"
         except ImportError:
             _reexec_into_venv()
-            sys.exit("edge недоступен: pip install edge-tts в venv скилла "
-                     f"({SILERO_VENV_PYTHON.parent.parent})")
+            sys.exit("edge недоступен — поставь голосовой стек: bash setup.sh")
     try:
         import torch  # noqa: F401
         return "silero"
     except ImportError:
         _reexec_into_venv()
     if requested == "silero":
-        sys.exit("silero недоступен: нет torch и нет venv "
-                 f"({SILERO_VENV_PYTHON})")
+        sys.exit("silero недоступен — поставь голосовой стек: bash setup.sh")
+    print("  ℹ голосового стека нет, озвучиваю системным голосом. "
+          "Для нормального голоса: bash setup.sh")
     return "say"
 
 

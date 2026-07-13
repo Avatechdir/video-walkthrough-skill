@@ -118,19 +118,18 @@ scenarios/
 ключевое слово читается медленнее с микропаузами. Заполняется при авторинге
 сценария.
 
-**Установка голосового стека** (разово, в venv скилла):
+**Установка голосового стека** — одной командой (идемпотентно):
 
 ```bash
-python3 -m venv ~/.claude/skills/video-walkthrough/.venv
-~/.claude/skills/video-walkthrough/.venv/bin/pip install \
-  torch omegaconf numpy ruaccent "transformers<5" num2words runorm edge-tts
+npm run setup
 ```
 
-Модели скачиваются в кэш при первом синтезе. Без стека `narrate.py` откатывается
-на системный `say -v Milena`.
+Собирает venv, качает базу словоформ и синхронизирует код в глобальную копию
+скилла. Модели скачиваются в кэш при первом синтезе. Без стека `narrate.py`
+откатывается на системный `say -v Milena`.
 
-> Уже пользуешься скиллом, но без озвучки? См. [UPGRADING.md](UPGRADING.md) —
-> пошагово, что забрать с `git pull`, а что поставить локально.
+> Уже пользуешься скиллом, но без озвучки? `git pull && npm run setup` —
+> подробности в [UPGRADING.md](UPGRADING.md).
 
 ## Принципы
 
