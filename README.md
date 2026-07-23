@@ -17,6 +17,14 @@ before/after frames of every step for UX/UI analysis.
 
 > One Gherkin scenario = specification + automated test + video script.
 
+![Demo: a Playwright scenario recorded as a captioned walkthrough](assets/demo.gif)
+
+Install as a skill:
+
+```bash
+npx skills add avatechdir/video-walkthrough-skill
+```
+
 ## What it looks like
 
 ```
