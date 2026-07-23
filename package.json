@@ -2,7 +2,7 @@
   "name": "video-walkthrough-skill",
   "private": true,
   "version": "0.1.0",
-  "description": "Claude Code skill: Playwright-сценарии как автотесты + видео-инструкции с субтитрами по шагам + скриншоты прохода для UX-анализа",
+  "description": "Claude Code skill: Playwright scenarios as automated tests + video walkthroughs with per-step subtitles + walkthrough screenshots for UX analysis",
   "scripts": {
     "setup": "bash setup.sh",
     "test": "playwright test --project=fast",
