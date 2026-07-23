@@ -21,6 +21,20 @@ before/after frames of every step for UX/UI analysis.
 
 > One Gherkin scenario = specification + automated test + video script.
 
+This scenario ([`scenarios/example-en.feature`](scenarios/example-en.feature)):
+
+```gherkin
+Feature: Demo · adding a task
+
+  Scenario: Add a task to the list
+    Given the demo app is open in English
+    When I type the text of a new task
+    And I click "Add"
+    Then the task appears in the list
+```
+
+…recorded by the skill, becomes this video — every step is a subtitle:
+
 ![Demo: a Playwright scenario recorded as a captioned walkthrough](assets/demo.gif)
 
 Install as a skill:
