@@ -1,6 +1,7 @@
 import { Page, Locator, expect } from '@playwright/test'
 import { test } from './fixtures'
 import { Captioner } from './caption'
+import { screensEnabled, nextStepIndex, shotStep } from './screens'
 
 /** Минимальное время субтитра на экране в видео-режиме (мс). */
 const STEP_HOLD_MS = Number(process.env.STEP_HOLD_MS ?? 5000)
@@ -17,12 +18,22 @@ function isVideoMode(): boolean {
  * 5 с) — чтобы человек успел прочитать. Быстрые шаги «дотягиваются» до минимума;
  * длинные (перетаскивание и т.п.) и так дольше. Для очень длинных подписей порог
  * растёт (≈60 мс/символ). В fast-режиме удержаний нет — прогон быстрый.
+ *
+ * При SCREENS=1 (fast-режим, `npm run screens`) каждый шаг дополнительно
+ * снимает чистые кадры до/после действия в screens/<сценарий>/ — банк
+ * скриншотов прохода для UX/UI-анализа. Кадр «до» первого шага пропускается:
+ * до навигации страница пуста.
  */
 export function step(cap: Captioner, text: string, body: () => Promise<void>): Promise<void> {
   return test.step(text, async () => {
+    const info = test.info()
+    const shots = screensEnabled(info)
+    const idx = shots ? nextStepIndex(info) : 0
     const t0 = Date.now()
     await cap.say(text)
+    if (shots && idx > 1) await shotStep(cap.page, info, idx, 'before', text)
     await body()
+    if (shots) await shotStep(cap.page, info, idx, 'after', text)
     if (isVideoMode()) {
       const need = Math.max(STEP_HOLD_MS, text.length * 60)
       await cap.hold(need - (Date.now() - t0))

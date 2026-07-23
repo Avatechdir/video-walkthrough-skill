@@ -9,8 +9,9 @@ import { finalizeVideo } from './record'
  */
 export const test = base.extend<{ cap: Captioner }>({
   cap: async ({ page }, use, testInfo) => {
-    if (testInfo.project.name === 'video') await installClickMarker(page)
-    await use(new Captioner(page))
+    const video = testInfo.project.name === 'video'
+    if (video) await installClickMarker(page)
+    await use(new Captioner(page, video))
   },
 })
 

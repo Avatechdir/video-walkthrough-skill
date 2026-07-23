@@ -11,17 +11,20 @@ export interface Cue {
  * копит тайминги реплик — из них на teardown собирается сайдкар `.srt`.
  * Плашка вшивается в кадр видео сама собой, отдельного прожига не требует.
  * Переживает навигацию (page.goto): восстанавливается на событии `load`.
+ *
+ * `visible: false` (fast-режим) — плашка не рисуется вовсе: DOM остаётся
+ * нетронутым, скриншоты прохода получаются чистыми; тайминги при этом копятся.
  */
 export class Captioner {
   private cues: Cue[] = []
   private readonly t0: number
   private last: string | null = null
 
-  constructor(private page: Page) {
+  constructor(readonly page: Page, private visible = true) {
     // Момент старта ≈ создание страницы/контекста (когда началась запись видео).
     this.t0 = Date.now()
     page.on('load', () => {
-      if (this.last) this.render(this.last).catch(() => {})
+      if (this.visible && this.last) this.render(this.last).catch(() => {})
     })
   }
 
@@ -55,7 +58,7 @@ export class Captioner {
   async say(text: string): Promise<void> {
     this.cues.push({ index: this.cues.length + 1, startMs: Date.now() - this.t0, text })
     this.last = text
-    await this.render(text)
+    if (this.visible) await this.render(text)
   }
 
   /** Подержать текущий кадр (чтобы субтитр успел прочитаться). */
