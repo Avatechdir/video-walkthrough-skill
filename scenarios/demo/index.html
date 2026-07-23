@@ -51,6 +51,16 @@
     <div class="empty" data-testid="empty">Пока пусто — добавьте первую задачу.</div>
   </main>
   <script>
+    // ?lang=en — английская локаль (для эталонного example-en.spec.ts)
+    if (new URLSearchParams(location.search).get('lang') === 'en') {
+      document.documentElement.lang = 'en'
+      document.title = 'Demo · task list'
+      document.querySelector('h1').textContent = 'Task list'
+      document.querySelector('p.sub').textContent = 'Demo app for the video-walkthrough skill'
+      document.querySelector('[data-testid="task-input"]').placeholder = 'What needs to be done?'
+      document.querySelector('[data-testid="add"]').textContent = 'Add'
+      document.querySelector('[data-testid="empty"]').textContent = 'Nothing yet — add your first task.'
+    }
     const input = document.querySelector('[data-testid="task-input"]')
     const list = document.querySelector('[data-testid="task-list"]')
     const empty = document.querySelector('[data-testid="empty"]')

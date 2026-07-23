@@ -5,6 +5,11 @@
     python3 lib/narrate.py videos                # все .mp4 с парным .srt
     python3 lib/narrate.py videos/example.mp4    # одно видео
     python3 lib/narrate.py videos --engine say   # принудительно движок
+    python3 lib/narrate.py videos --lang en      # принудительно язык
+
+Язык (--lang auto|ru|en, по умолчанию auto) определяется по субтитрам каждого
+видео отдельно: кириллицы больше — русский, иначе английский. Русский конвейер
+(RUAccent, accents.json, runorm) для английского пропускается — там он не нужен.
 
 Движки (--engine auto|silero|edge|say):
     silero — локальная нейросеть, офлайн, детерминированно; SSML-паузы и
@@ -34,10 +39,11 @@ from pathlib import Path
 # venv с torch для Silero, создаётся при разовой настройке скилла
 SILERO_VENV_PYTHON = Path.home() / ".claude/skills/video-walkthrough/.venv/bin/python"
 
-SILERO_SPEAKER = "xenia"
+SILERO_MODEL = {"ru": "v4_ru", "en": "v3_en"}
+SILERO_SPEAKER = {"ru": "xenia", "en": "en_0"}
 SILERO_SAMPLE_RATE = 48000
-EDGE_VOICE = "ru-RU-SvetlanaNeural"
-SAY_VOICE = "Milena"
+EDGE_VOICE = {"ru": "ru-RU-SvetlanaNeural", "en": "en-US-AriaNeural"}
+SAY_VOICE = {"ru": "Milena", "en": "Samantha"}
 SAY_RATE = 180  # слов/мин
 MAX_ATEMPO = 2.0  # предел ускорения фразы, не влезающей в свой слот
 
@@ -64,6 +70,15 @@ def parse_srt(path: Path):
         if text:
             cues.append((start, end, text))
     return cues
+
+
+def detect_lang(cues) -> str:
+    """Язык озвучки по субтитрам видео: кириллицы больше латиницы — ru, иначе en.
+    Латинские термины внутри русских фраз (Whisper, PDF) детект не сбивают."""
+    text = " ".join(t for _, _, t in cues)
+    cyr = len(re.findall(r"[а-яё]", text, re.I))
+    lat = len(re.findall(r"[a-z]", text, re.I))
+    return "ru" if cyr >= lat else "en"
 
 
 def _reexec_into_venv():
@@ -200,13 +215,29 @@ def _auto_accent(fragment: str) -> str:
     return fragment
 
 
-def speech_text(text: str) -> str:
+def speech_text(text: str, lang: str = "ru") -> str:
     """Готовит текст для синтеза (субтитры не трогает). Silero понимает `+`
     перед ударной гласной, а латиницу и цифры молча выбрасывает — поэтому:
     словарные термины подставляются как есть (и защищены от RUAccent, который
     стирает чужие `+` и переупрямливает слова), остальное получает
-    автоударения и числа словами."""
+    автоударения и числа словами.
+
+    Для en весь русский конвейер пропускается: только числа словами
+    (silero en тоже молча выбрасывает цифры)."""
     text = text.replace("·", ".")  # маркер темы → пауза в речи
+    if lang == "en":
+        try:
+            from num2words import num2words
+            text = re.sub(
+                r"\d+[.,]\d+",
+                lambda m: num2words(float(m.group().replace(",", ".")), lang="en"),
+                text)
+            text = re.sub(r"\d+",
+                          lambda m: num2words(int(m.group()), lang="en"),
+                          text)
+        except ImportError:
+            pass
+        return text
     d = load_accent_dict()
     if not d:
         result = _auto_accent(text)
@@ -231,7 +262,7 @@ def speech_text(text: str) -> str:
     return result
 
 
-def build_ssml(text: str, emphasis=()) -> str:
+def build_ssml(text: str, emphasis=(), lang: str = "ru") -> str:
     """SSML для silero: паузы по пунктуации + смысловые акценты.
     Ключевые слова читаются медленнее с микропаузами — эмуляция emphasis,
     которого у Silero нет. Каждый фрагмент проходит speech_text отдельно."""
@@ -251,7 +282,7 @@ def build_ssml(text: str, emphasis=()) -> str:
 
     out = []
     for is_emph, frag in parts:
-        s = escape(speech_text(frag))
+        s = escape(speech_text(frag, lang))
         s = s.replace("—", '<break time="350ms"/>')
         s = re.sub(r":\s", ':<break time="250ms"/> ', s)
         if is_emph:
@@ -261,21 +292,20 @@ def build_ssml(text: str, emphasis=()) -> str:
     return "<speak>" + "".join(out) + "</speak>"
 
 
-_silero_model = None
+_silero_models = {}
 
 
-def synth_silero(text: str, out_wav: Path, emphasis=()):
-    global _silero_model
+def synth_silero(text: str, out_wav: Path, emphasis=(), lang: str = "ru"):
     import torch
     import wave
 
-    if _silero_model is None:
-        _silero_model, _ = torch.hub.load(
+    if lang not in _silero_models:
+        _silero_models[lang], _ = torch.hub.load(
             "snakers4/silero-models", "silero_tts",
-            language="ru", speaker="v4_ru", trust_repo=True,
+            language=lang, speaker=SILERO_MODEL[lang], trust_repo=True,
         )
-    audio = _silero_model.apply_tts(
-        ssml_text=build_ssml(text, emphasis), speaker=SILERO_SPEAKER,
+    audio = _silero_models[lang].apply_tts(
+        ssml_text=build_ssml(text, emphasis, lang), speaker=SILERO_SPEAKER[lang],
         sample_rate=SILERO_SAMPLE_RATE
     )
     pcm = (audio.clamp(-1, 1) * 32767).to(torch.int16).numpy().tobytes()
@@ -286,12 +316,15 @@ def synth_silero(text: str, out_wav: Path, emphasis=()):
         w.writeframes(pcm)
 
 
-def edge_text(text: str) -> str:
+def edge_text(text: str, lang: str = "ru") -> str:
     """Подготовка текста для edge: словарь произношений применяется как
     простая подмена текста (Svetlana читает «мэнэджэр» как написано),
     `+`-разметка ударений отбрасывается — edge её не понимает, а SSML-фонемы
-    через edge-tts не работают. RUAccent/числа/runorm не нужны — голос сам."""
+    через edge-tts не работают. RUAccent/числа/runorm не нужны — голос сам.
+    Для en словарь не применяется: он про русское произношение латиницы."""
     text = text.replace("·", ".")
+    if lang == "en":
+        return text
     d = load_accent_dict()
     for key in sorted(d, key=len, reverse=True):
         text = re.sub(rf"(?<!\w){re.escape(key)}(?!\w)",
@@ -299,18 +332,20 @@ def edge_text(text: str) -> str:
     return text
 
 
-def synth_edge(text: str, out_mp3: Path):
+def synth_edge(text: str, out_mp3: Path, lang: str = "ru"):
     """Нейроголос Microsoft: сам интонирует по смыслу, читает латиницу
     и числа; словарь произношений применяется текстовой подменой."""
     import asyncio
     import edge_tts
     asyncio.run(
-        edge_tts.Communicate(edge_text(text), EDGE_VOICE).save(str(out_mp3)))
+        edge_tts.Communicate(edge_text(text, lang),
+                             EDGE_VOICE[lang]).save(str(out_mp3)))
 
 
-def synth_say(text: str, out_aiff: Path):
+def synth_say(text: str, out_aiff: Path, lang: str = "ru"):
     subprocess.run(
-        ["say", "-v", SAY_VOICE, "-r", str(SAY_RATE), "-o", str(out_aiff), text],
+        ["say", "-v", SAY_VOICE[lang], "-r", str(SAY_RATE),
+         "-o", str(out_aiff), text],
         check=True,
     )
 
@@ -324,7 +359,7 @@ def probe_duration(path: Path) -> float:
     return float(out.stdout.strip())
 
 
-def narrate(video: Path, engine: str) -> bool:
+def narrate(video: Path, engine: str, lang_arg: str = "auto") -> bool:
     srt = video.with_suffix(".srt")
     if not srt.exists():
         print(f"  пропуск: нет {srt.name}")
@@ -333,6 +368,7 @@ def narrate(video: Path, engine: str) -> bool:
     if not cues:
         print(f"  пропуск: {srt.name} пуст")
         return False
+    lang = lang_arg if lang_arg != "auto" else detect_lang(cues)
 
     sidecar = {}
     sidecar_path = video.with_suffix(".speech.json")
@@ -349,11 +385,11 @@ def narrate(video: Path, engine: str) -> bool:
             if engine == "silero":
                 meta = sidecar.get(text, {})
                 emphasis = meta.get("emphasis", []) if isinstance(meta, dict) else meta
-                synth_silero(text, clip, emphasis)
+                synth_silero(text, clip, emphasis, lang)
             elif engine == "edge":
-                synth_edge(text, clip)
+                synth_edge(text, clip, lang)
             else:
-                synth_say(text, clip)
+                synth_say(text, clip, lang)
             clips.append((start, end, text, clip))
 
         # Каждая фраза: ресемпл в моно 48к, ужатие в свой слот, сдвиг на start.
@@ -394,7 +430,7 @@ def narrate(video: Path, engine: str) -> bool:
             check=True,
         )
         out.replace(video)
-    print(f"  ✓ {video.name}: озвучено {len(cues)} фраз ({engine})")
+    print(f"  ✓ {video.name}: озвучено {len(cues)} фраз ({engine}, {lang})")
     return True
 
 
@@ -403,6 +439,8 @@ def main():
     ap.add_argument("target", help=".mp4 или каталог с .mp4+.srt")
     ap.add_argument("--engine", choices=["auto", "silero", "edge", "say"],
                     default="auto")
+    ap.add_argument("--lang", choices=["auto", "ru", "en"], default="auto",
+                    help="язык озвучки; auto — по субтитрам каждого видео")
     args = ap.parse_args()
 
     target = Path(args.target)
@@ -412,7 +450,7 @@ def main():
 
     engine = pick_engine(args.engine)
     print(f"движок: {engine}")
-    done = sum(narrate(v, engine) for v in videos)
+    done = sum(narrate(v, engine, args.lang) for v in videos)
     print(f"готово: {done}/{len(videos)}")
 
 

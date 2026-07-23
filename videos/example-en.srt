@@ -1,0 +1,15 @@
+1
+00:00:00,001 --> 00:00:05,010
+Skill demo: adding a task to the list
+
+2
+00:00:05,010 --> 00:00:10,018
+Type the text of a new task
+
+3
+00:00:10,018 --> 00:00:15,024
+Click "Add"
+
+4
+00:00:15,024 --> 00:00:17,524
+Done: the task appears in the list
