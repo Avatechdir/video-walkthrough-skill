@@ -1,5 +1,10 @@
 # video-walkthrough-skill
 
+[![License: MIT](https://img.shields.io/github/license/Avatechdir/video-walkthrough-skill)](LICENSE)
+[![Install via skills.sh](https://img.shields.io/badge/skills.sh-npx%20skills%20add-black)](https://skills.sh/avatechdir/video-walkthrough-skill)
+[![Claude Code skill](https://img.shields.io/badge/Claude%20Code-skill-d97757)](https://claude.com/claude-code)
+[![GitHub stars](https://img.shields.io/github/stars/Avatechdir/video-walkthrough-skill?style=social)](https://github.com/Avatechdir/video-walkthrough-skill/stargazers)
+
 > 🇷🇺 [Русская версия](README.ru.md) — документация на русском.
 
 <p align="center">
@@ -206,3 +211,7 @@ global skill copy. Models are cached on first synthesis. Without the stack
 ## License
 
 MIT.
+
+---
+
+If this skill saved you a demo-recording session — a ⭐ helps others find it.

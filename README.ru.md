@@ -1,5 +1,10 @@
 # video-walkthrough-skill
 
+[![License: MIT](https://img.shields.io/github/license/Avatechdir/video-walkthrough-skill)](LICENSE)
+[![Установка через skills.sh](https://img.shields.io/badge/skills.sh-npx%20skills%20add-black)](https://skills.sh/avatechdir/video-walkthrough-skill)
+[![Скилл Claude Code](https://img.shields.io/badge/Claude%20Code-skill-d97757)](https://claude.com/claude-code)
+[![Звёзды GitHub](https://img.shields.io/github/stars/Avatechdir/video-walkthrough-skill?style=social)](https://github.com/Avatechdir/video-walkthrough-skill/stargazers)
+
 > 🇬🇧 [English version](README.md)
 
 <p align="center">
@@ -208,3 +213,7 @@ npm run setup
 ## Лицензия
 
 MIT.
+
+---
+
+Если скилл сэкономил вам сессию записи демо — ⭐ помогает другим его найти.
