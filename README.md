@@ -2,6 +2,10 @@
 
 > 🇷🇺 [Русская версия](README.ru.md) — документация на русском.
 
+<p align="center">
+  <img src="assets/hero.jpeg" alt="Clawd cutting a film strip out of a Playwright test scenario: mp4, srt and png come out" width="720">
+</p>
+
 **A [Claude Code](https://claude.com/claude-code) skill that turns one
 Playwright scenario into an automated test + a video walkthrough with
 per-step subtitles.**

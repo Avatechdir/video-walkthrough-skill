@@ -2,6 +2,10 @@
 
 > 🇬🇧 [English version](README.md)
 
+<p align="center">
+  <img src="assets/hero.jpeg" alt="Clawd нарезает киноплёнку из Playwright-сценария: на выходе mp4, srt и png" width="720">
+</p>
+
 **Скилл для [Claude Code](https://claude.com/claude-code): превращает один
 Playwright-сценарий в автотест + видео-инструкцию с субтитрами по шагам.**
 
