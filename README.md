@@ -42,6 +42,11 @@ Feature: Demo · adding a task
 
 ![Demo: a Playwright scenario recorded as a captioned walkthrough](assets/demo.gif)
 
+▶️ **The same walkthrough with voice narration** — the audio is synthesized
+offline from the subtitles by the skill itself:
+
+https://github.com/user-attachments/assets/0cd9778b-f6f6-442d-9bb0-21d1d464c423
+
 Install as a skill:
 
 ```bash
